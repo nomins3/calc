@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <link rel="icon" href="faviconV2.png" type="image/png">
+    <meta charset="UTF-8">
+    <title>Ultra Fast Fork Calc</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; display: flex; justify-content: center; padding: 20px; }
+        .wrapper { width: 900px; display: flex; flex-direction: column; gap: 20px; }
+        
+        .header { background: #1e1e1e; padding: 20px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        .header input { background: #000; color: #2ecc71; border: 1px solid #444; font-size: 24px; width: 150px; padding: 5px; text-align: center; }
+
+        .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .arm-box { background: #1e1e1e; padding: 15px; border-radius: 15px; border: 2px solid #333; transition: 0.3s; }
+        
+        .display-k { font-size: 40px; text-align: center; color: #3498db; margin-bottom: 15px; font-family: monospace; background: #000; border-radius: 10px; padding: 10px; }
+
+        /* Сетки кнопок */
+        .btn-panel { display: flex; flex-direction: column; gap: 10px; }
+        .btn-row { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+        
+        button { border: none; padding: 10px 2px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; color: #fff; }
+        .btn-int { background: #2c3e50; } /* Целые */
+        .btn-dec { background: #34495e; } /* Десятые */
+        .btn-cent { background: #7f8c8d; font-size: 11px; } /* Сотые */
+        button:hover { filter: brightness(1.3); }
+        button.active { outline: 2px solid #3498db; background: #3498db !important; }
+
+        .results { background: #1e1e1e; padding: 20px; border-radius: 15px; border: 1px solid #333; display: flex; justify-content: space-around; text-align: center; }
+        .res-item span { display: block; color: #888; font-size: 12px; margin-bottom: 5px; }
+        .res-item b { font-size: 28px; color: #2ecc71; }
+        
+        .win-box { border-color: #2ecc71 !important; box-shadow: 0 0 15px rgba(46, 204, 113, 0.2); }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div class="header">
+        <div>БАНК: <input type="number" id="bank" value="1000" oninput="calc()"></div>
+        <div style="font-size: 20px;">ROI: <b id="roi" style="color: #2ecc71;">0.00</b>%</div>
+    </div>
+
+    <div class="main-grid">
+        <div class="arm-box" id="box1">
+            <div class="display-k" id="out1">1.00</div>
+            <div class="btn-panel" id="panel1">
+                <div class="btn-row" id="ints1"></div>
+                <div class="btn-row" id="decs1"></div>
+                <div class="btn-row" id="cents1"></div>
+            </div>
+        </div>
+
+        <div class="arm-box" id="box2">
+            <div class="display-k" id="out2">1.00</div>
+            <div class="btn-panel" id="panel2">
+                <div class="btn-row" id="ints2"></div>
+                <div class="btn-row" id="decs2"></div>
+                <div class="btn-row" id="cents2"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="results">
+        <div class="res-item"><span>Ставка 1</span><b id="s1">0</b></div>
+        <div class="res-item"><span>Ставка 2</span><b id="s2">0</b></div>
+        <div class="res-item"><span>Чистый профит</span><b id="profit">0.00</b></div>
+    </div>
+</div>
+
+<script>
+    // Состояние коэффициентов: [Целое, Десятое, Сотое]
+    let state = {
+        k1: [1, 0, 0],
+        k2: [1, 0, 0]
+    };
+
+    function createButtons(armNum) {
+        const rows = [
+            { id: 'ints'+armNum, class: 'btn-int', vals: [1,2,3,4,5,6,7,8,9,10], type: 0 },
+            { id: 'decs'+armNum, class: 'btn-dec', vals: [0,.1,.2,.3,.4,.5,.6,.7,.8,.9], type: 1 },
+            { id: 'cents'+armNum, class: 'btn-cent', vals: [0,.01,.02,.03,.04,.05,.06,.07,.08,.09], type: 2 }
+        ];
+
+        rows.forEach(row => {
+            const container = document.getElementById(row.id);
+            row.vals.forEach(v => {
+                const btn = document.createElement('button');
+                btn.className = row.class;
+                btn.textContent = v === 0 ? "0" : (v < 1 ? v.toString().replace("0.", ".") : v);
+                btn.onclick = () => {
+                    // Снимаем активный класс у соседей
+                    container.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    state['k'+armNum][row.type] = v;
+                    updateK(armNum);
+                };
+                if(v === (row.type === 0 ? 1 : 0)) btn.classList.add('active'); // Начальный выбор
+                container.appendChild(btn);
+            });
+        });
+    }
+
+    function updateK(num) {
+        let val = state['k'+num][0] + state['k'+num][1] + state['k'+num][2];
+        document.getElementById('out'+num).textContent = val.toFixed(2);
+        calc();
+    }
+
+    function calc() {
+        let B = parseFloat(bank.value) || 0;
+        let k1v = state.k1[0] + state.k1[1] + state.k1[2];
+        let k2v = state.k2[0] + state.k2[1] + state.k2[2];
+
+        if (k1v <= 1 || k2v <= 1) return;
+
+        let s1v = B * (k2v / (k1v + k2v));
+        let s2v = B * (k1v / (k1v + k2v));
+        let prof = (s1v * k1v) - B;
+        let m = (prof / B) * 100;
+
+        s1.textContent = Math.round(s1v);
+        s2.textContent = Math.round(s2v);
+        profit.textContent = prof.toFixed(2);
+        roi.textContent = m.toFixed(2);
+
+        // Подсветка карточек
+        document.getElementById('box1').className = 'arm-box' + (m > 0 ? ' win-box' : '');
+        document.getElementById('box2').className = 'arm-box' + (m > 0 ? ' win-box' : '');
+    }
+
+    createButtons(1);
+    createButtons(2);
+    calc();
+</script>
+
+</body>
+</html>
